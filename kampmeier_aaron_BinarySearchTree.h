@@ -57,6 +57,8 @@ protected:
 	Node *root;
 	void deleteBinaryTree(Node *root);
 	int lengthOfTree(const Node *rootNode);
+	void addNodeToRepresentationalArray(const Node *node, T *array, int nodeIndex);
+	void addNodeToInOrderArray(Node *node, T *array, int &currentWriteIndex);
 	
 public:
 	BinarySearchTree();
@@ -66,7 +68,8 @@ public:
 	bool remove(const T &payloadToRemove);
 	bool elementExists(const T &payload);
 	const T *find(const T &payload);
-	T *toArray(int &returnLength);
+	T *toRepresentationalArray(int &returnLength);
+	T *toInOrderArray(int &returnLength);
 	bool empty();
 	int length();
 };

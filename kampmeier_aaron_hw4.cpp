@@ -8,6 +8,8 @@
 #include <iostream>
 #include "kampmeier_aaron_BinarySearchTree.h"
 
+using namespace std;
+
 int main() {
 	std::cout << "Hello, World!" << std::endl;
 	
@@ -18,9 +20,20 @@ int main() {
 	binarySearchTree->insert(5);
 	binarySearchTree->insert(1);
 	binarySearchTree->insert(6);
+	binarySearchTree->insert(1);
 	binarySearchTree->insert(2);
 	
-	BinarySearchTree<char[]> *bst = new BinarySearchTree<char[]>();
+	binarySearchTree->remove(3);
+	
+	cout << "6 Exists: " << binarySearchTree->elementExists(6) << endl;
+	cout << "1 Exists: " << binarySearchTree->elementExists(1) << endl;
+	
+	int length;
+	int *repArray = binarySearchTree->toRepresentationalArray(length);
+	int *inOrderArray = binarySearchTree->toInOrderArray(length);
+	
+	delete [] repArray;
+	delete [] inOrderArray;
 	
 	return 0;
 }

@@ -29,7 +29,7 @@ BinarySearchTree<T>::BinarySearchTree() {
  */
 template<class T>
 BinarySearchTree<T>::~BinarySearchTree() {
-	//TODO:
+	empty();
 }
 
 /**
@@ -68,7 +68,7 @@ const T *BinarySearchTree<T>::insert(const T &payload) {
 	
 	// Reached the end of the list and didn't find any previously added equal payloads, so just add it here
 	*parentConnection = new Node(payload);
-	return &(*parentConnection->payload);
+	return &((*parentConnection)->payload);
 }
 
 /**
@@ -79,20 +79,20 @@ const T *BinarySearchTree<T>::insert(const T &payload) {
  */
 template<class T>
 bool BinarySearchTree<T>::remove(const T &payloadToRemove) {
-	// checkingAgainst stores the node in the list we're currently checking if it's equal to the payload to remove
-	// parent stores the parent to that one
+	// We're gonna traverse our tree checking each node until we find the one to delete, which will end up in
+	// currentNode
 	Node *currentNode = root;
-	Node **parentConnection = nullptr;
-	
-//	Node *parent = root;
-//	Node *checkingAgainst = root;
+	// Because we need to also update the parent's connection to the node we're deleting, we'll store a pointer to
+	// the parent's connection to the child to be deleted. This is a pointer to either the left or right properties
+	// on Node.
+	Node **parentConnection = &root;
 	
 	while (currentNode != nullptr) {
 		if (payloadToRemove < currentNode->payload) {
 			// Go to the left side
 			parentConnection = &(currentNode->left);
 			currentNode = currentNode->left;
-		} else if (payloadToRemove > currentNode->right) {
+		} else if (payloadToRemove > currentNode->payload) {
 			// Go to the right side
 			parentConnection = &(currentNode->right);
 			currentNode = currentNode->right;
@@ -115,23 +115,33 @@ bool BinarySearchTree<T>::remove(const T &payloadToRemove) {
 			}
 			// 3. Node has two children
 			else {
-				// To delete a node with two children, we replace it with its in order successor. The successor is
-				// necessarily a leaf so we don't have to worry about it's children
-				Node *inOrderSuccessor = currentNode;
-				
+				//To delete a node with two children, we replace it with its in order successor. The successor
+				// necessarily does not have a left child
+				//To find the in order successor, we will jump to the right child and then traverse down the left side
+				Node *inOrderSuccessor = currentNode->right;
+				Node **inOrderSuccessorParentConnection = &(currentNode->right);
 				while (inOrderSuccessor->left != nullptr) {
-					inOrderSuccessor= inOrderSuccessor->left;
+					inOrderSuccessorParentConnection = &(inOrderSuccessor->left);
+					inOrderSuccessor = inOrderSuccessor->left;
 				}
 				
-				// Move the parent's connection over to the successor if there is a parent
-				if (parentConnection != nullptr) {
-					*parentConnection = inOrderSuccessor;
-				}
+				// Move the parent's connection over to the successor
+				*parentConnection = inOrderSuccessor;
+				
+				// Replace the old parent connection to the successor with the successor's right child
+				*inOrderSuccessorParentConnection = inOrderSuccessor->right;
 				
 				// Move the left child from the current node over
-				inOrderSuccessor
+				inOrderSuccessor->left = currentNode->left;
+				
+				// Move the right child over
+				inOrderSuccessor->right = currentNode->right;
+				
+				// Now delete the old node because everything has been moved over
+				delete currentNode;
 			}
 			
+			return true;
 		} else {
 			exit(NODE_COMPARISON_FAILURE_EXIT);
 		}
@@ -139,23 +149,6 @@ bool BinarySearchTree<T>::remove(const T &payloadToRemove) {
 	
 	// Once we get here, then we know we didn't find the payload. Failure.
 	return false;
-	
-	while (checkingAgainst != nullptr) {
-		
-		
-		if (payloadToRemove < checkingAgainst->payload) {
-			parent = checkingAgainst;
-			checkingAgainst = checkingAgainst->left;
-		} else if (payloadToRemove > checkingAgainst->payload) {
-			parent = checkingAgainst;
-			checkingAgainst = checkingAgainst->right;
-		} else if (payloadToRemove == checkingAgainst->payload) {
-			//This is the node we want to delete
-			
-		} else {
-			exit(NODE_COMPARISON_FAILURE_EXIT);
-		}
-	}
 }
 
 /**
@@ -199,10 +192,83 @@ const T * BinarySearchTree<T>::find(const T &payload) {
 	return nullptr;
 }
 
+/**
+ * Returns a representation of the current BST stored in an array structure. Stores it in an array the traditional
+ * way, and not in-order.
+ * @tparam T
+ * @param returnLength A reference variable where the length of the returned array will be set into.
+ * @return The array representation of all the Nodes in the BST
+ */
 template<class T>
-T *BinarySearchTree<T>::toArray(int &returnLength) {
-	//TODO:
-	return nullptr;
+T *BinarySearchTree<T>::toRepresentationalArray(int &returnLength) {
+	//TODO: Arr length is wrong, it should be 2^(max depth)
+	const int arrLength = 
+	auto *outputArray = new T[arrLength];
+	
+	addNodeToRepresentationalArray(root, outputArray, 0);
+	
+	returnLength = arrLength;
+	return outputArray;
+}
+
+/**
+ * Recursively defined method that adds a specified node to the output array at the specified index. Then calls on
+ * its child nodes to do the same at their indices. The indices for the child storage are standard. If a parent node
+ * is stored at index k in a representational array, then its left child is stored at 2k+1.
+ * @tparam T
+ * @param node The parent node to store
+ * @param array The output representational array to write to
+ * @param nodeIndex The index to store the parent node at
+ */
+template<class T>
+void BinarySearchTree<T>::addNodeToRepresentationalArray(const BinarySearchTree::Node *node, T *array,
+														 const int nodeIndex) {
+	if (node != nullptr) {
+		array[nodeIndex] = node->payload;
+		addNodeToRepresentationalArray(node->left, array, 2 * nodeIndex + 1);
+		addNodeToRepresentationalArray(node->right, array, 2 * nodeIndex + 2);
+	}
+}
+
+/**
+ * Returns an ordered array of the payloads stored within this BST.
+ * @tparam T
+ * @param returnLength A reference variable where the length of the returned array will be set into.
+ * @return The return, in-order collection of payloads
+ */
+template<class T>
+T *BinarySearchTree<T>::toInOrderArray(int &returnLength) {
+	const int arrLength = length();
+	auto *outputArray = new T[arrLength];
+	// Variable to track the current write index in the array
+	int arrWriteIndex = 0;
+	
+	addNodeToInOrderArray(root, outputArray, arrWriteIndex);
+	
+	returnLength = arrLength;
+	return outputArray;
+}
+
+/**
+ * Recursively defined method to add the payloads of a node and its children to an array in-order. Because each
+ * recursive call has no idea how many array slots its children will take up, we keep a reference to a singular
+ * currentWriteIndex variable that increments every time we write to the array.
+ * @tparam T
+ * @param node
+ * @param array The array to write into. Must be at least of length lengthOfTree(node).
+ * @param currentWriteIndex A reference to the write index to start writing from, will be updated as more values are
+ * written into the array.
+ */
+template<class T>
+void BinarySearchTree<T>::addNodeToInOrderArray(Node *node, T *array, int &currentWriteIndex) {
+	if (node != nullptr) {
+		addNodeToInOrderArray(node->left, array, currentWriteIndex);
+		
+		array[currentWriteIndex] = node->payload;
+		currentWriteIndex++;
+		
+		addNodeToInOrderArray(node->right, array, currentWriteIndex);
+	}
 }
 
 /**
@@ -260,6 +326,9 @@ int BinarySearchTree<T>::lengthOfTree(const BinarySearchTree::Node *rootNode) {
 	}
 }
 
+
+
+
 /**
  * Generates a new Node with payload and both children connections set to null.
  * @tparam T
@@ -286,48 +355,9 @@ bool BinarySearchTree<T>::Node::operator==(const BinarySearchTree::Node &other) 
 }
 
 /**
- * Destructs the node. Shouldn't have to do anything special because no pointers are managed by this Node.
+ * Destructs the node. Shouldn't have to do anything special because no pointers are managed by this Node. Does not
+ * cascade delete nodes below it.
  * @tparam T
  */
 template<class T>
-BinarySearchTree<T>::Node::~Node() {
-	delete left;
-	delete right;
-	delete payload;
-}
-
-/**
- * Finds the in order predecessor of the node. Goes to the left to start and then walks down the right chain until it
- * finds the node closest to but still less than this node.
- * @tparam T
- * @return In order predecessor
- */
-template<class T>
-typename BinarySearchTree<T>::Node *BinarySearchTree<T>::Node::inOrderPredecessor() {
-	Node *currentNode = left;
-	
-	while (currentNode->right != nullptr) {
-		currentNode = currentNode->right;
-	}
-	
-	// We've hit the end of the right chain, return this node
-	return currentNode;
-}
-
-/**
- * Finds the in order successor of the node. Goes to the right, and then walks down the left chain to find the
- * smallest value closest to this node.
- * @tparam T
- * @return In order successor
- */
-template<class T>
-typename BinarySearchTree<T>::Node *BinarySearchTree<T>::Node::inOrderSuccessor() {
-	Node *currentNode = right;
-	
-	while (currentNode->left != nullptr) {
-		currentNode = currentNode->left;
-	}
-	
-	//Hit the end of the right chain
-	return currentNode;
-}
+BinarySearchTree<T>::Node::~Node() = default;
