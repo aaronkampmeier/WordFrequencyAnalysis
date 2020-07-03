@@ -29,11 +29,65 @@ int main() {
 	cout << "1 Exists: " << binarySearchTree->elementExists(1) << endl;
 	
 	int length;
-	int *repArray = binarySearchTree->toRepresentationalArray(length);
-	int *inOrderArray = binarySearchTree->toInOrderArray(length);
+	const int **repArray = binarySearchTree->asRepresentationalArray(length);
+	int *outputRepArrary = binarySearchTree->copyPayloads(repArray, length);
+	
+	for (int i=0; i < length; i++) {
+		cout << outputRepArrary[i] << " ";
+	}
+	cout << endl;
+	
+	const int **inOrderArray = binarySearchTree->asInOrderArray(length);
+	int *outputInOrderArray = binarySearchTree->copyPayloads(inOrderArray, length);
+	
+	for (int i=0; i < length; i++) {
+		cout << outputInOrderArray[i] << " ";
+	}
+	cout << endl;
+	
+	
+	BinarySearchTree<int*> *secondBst = new BinarySearchTree<int*>();
+//	secondBst->insert(&length);
+	int a1 = 10;
+	secondBst->insert(&a1);
+	
+	int a2 = 15;
+	int a3 = 1;
+	int a4 = -23;
+	int a5 = 22;
+	int a6 = 3;
+	secondBst->insert(&a2);
+	secondBst->insert(&a3);
+	secondBst->insert(&a4);
+	secondBst->insert(&a5);
+	secondBst->insert(&a6);
+	secondBst->insert(&a2);
+	
+	int* const** secondBstInOrderPointers = secondBst->asInOrderArray(length);
+	
+	int **secondBstInOrder = secondBst->copyPayloads(secondBstInOrderPointers, length);
+	for (int i=0; i < length; i++) {
+		cout << secondBstInOrder[i] << ": " << *secondBstInOrder[i] << ", ";
+	}
+	cout << endl;
+
+	int* const** secondBstRepPointers = secondBst->asRepresentationalArray(length);
+	int **secondBstRep = secondBst->copyPayloads(secondBstRepPointers, length);
+
+	for (int i=0; i < length; i++) {
+		if (secondBstRep[i] != nullptr) {
+			cout << secondBstRep[i] << ": " << *secondBstRep[i] << ", ";
+		} else {
+			cout << "empty, ";
+		}
+	}
+	cout << endl;
+	
 	
 	delete [] repArray;
 	delete [] inOrderArray;
+	delete [] outputInOrderArray;
+	delete [] outputRepArrary;
 	
 	return 0;
 }

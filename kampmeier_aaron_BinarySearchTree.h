@@ -10,6 +10,8 @@
 
 #define NODE_COMPARISON_FAILURE_EXIT 1
 
+#include <cmath>
+
 /**
  * Manages a Binary Search tree with nodes that store a templated payload type. Nodes are hidden to the user; the user
  * cannot access or manipulate them directly. The only public interfaces operate on "payloads" which are the values
@@ -41,7 +43,7 @@ protected:
 		friend class BinarySearchTree;
 	private:
 		Node *left, *right;
-		T payload;
+		const T payload;
 	public:
 		explicit Node(const T &newPayload);
 		~Node();
@@ -57,8 +59,9 @@ protected:
 	Node *root;
 	void deleteBinaryTree(Node *root);
 	int lengthOfTree(const Node *rootNode);
-	void addNodeToRepresentationalArray(const Node *node, T *array, int nodeIndex);
-	void addNodeToInOrderArray(Node *node, T *array, int &currentWriteIndex);
+	int maxDepthOfTree(const Node *rootNode);
+	void addNodeToRepresentationalArray(const Node *node, const T **array, int nodeIndex);
+	void addNodeToInOrderArray(Node *node, const T **array, int &currentWriteIndex);
 	
 public:
 	BinarySearchTree();
@@ -68,10 +71,13 @@ public:
 	bool remove(const T &payloadToRemove);
 	bool elementExists(const T &payload);
 	const T *find(const T &payload);
-	T *toRepresentationalArray(int &returnLength);
-	T *toInOrderArray(int &returnLength);
 	bool empty();
 	int length();
+	
+	// Exporting
+	const T **asRepresentationalArray(int &returnLength);
+	const T **asInOrderArray(int &returnLength);
+	T *copyPayloads(const T **payloadPointers, const int &length);
 };
 
 //A little trick I picked up from https://www.codeproject.com/Articles/48575/How-to-Define-a-Template-Class-in-a-h-File-and-Imp

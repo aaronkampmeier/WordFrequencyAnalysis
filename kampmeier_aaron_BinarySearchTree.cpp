@@ -193,18 +193,28 @@ const T * BinarySearchTree<T>::find(const T &payload) {
 }
 
 /**
- * Returns a representation of the current BST stored in an array structure. Stores it in an array the traditional
- * way, and not in-order.
+ * Returns a representation of the current BST stored in an array structure. Stores the entire tree in an array
+ * preserving all of the nodes' connections, not in-order: root stored at index 0, left and right children of a node
+ * at index k are at 2k+1 ans 2k+2 respectively.
  * @tparam T
  * @param returnLength A reference variable where the length of the returned array will be set into.
- * @return The array representation of all the Nodes in the BST
+ * @return The array representation of all the Nodes in the BST with pointers to each of the payloads. Can be NULL if
+ * there are no elements in the BST.
  */
 template<class T>
-T *BinarySearchTree<T>::toRepresentationalArray(int &returnLength) {
-	//TODO: Arr length is wrong, it should be 2^(max depth)
-	const int arrLength = 
-	auto *outputArray = new T[arrLength];
+const T **BinarySearchTree<T>::asRepresentationalArray(int &returnLength) {
+	// The length of the rep array is 2^(max depth) + 2^(max depth - 1) + ... + 2^0 which is a geometric series with
+	// r=2 and a1 = 1. The number of terms, n, in the series is maxDepth + 1. The geometric series formula is S_n = a1 *
+	// (1-r^n) / (1-r).
+	const int maxDepth = maxDepthOfTree(root);
+	const int arrLength = 1 * (1 - pow(2,maxDepth + 1)) / (1 - 2);
+	if (arrLength < 1) {
+		// No elements in the BST, return null
+		return nullptr;
+	}
+	const T **outputArray = new T const *[arrLength];
 	
+	//TODO: Make this array a list of pointers to payloads, because values in here can and should be NULL
 	addNodeToRepresentationalArray(root, outputArray, 0);
 	
 	returnLength = arrLength;
@@ -212,34 +222,62 @@ T *BinarySearchTree<T>::toRepresentationalArray(int &returnLength) {
 }
 
 /**
- * Recursively defined method that adds a specified node to the output array at the specified index. Then calls on
- * its child nodes to do the same at their indices. The indices for the child storage are standard. If a parent node
- * is stored at index k in a representational array, then its left child is stored at 2k+1.
+ * Recursively finds the max depth of a binary tree starting at the root node. The depth of a tree defined by a root
+ * node is the greater max depth of the left node tree vs of the right node tree, + 1 for the current node.
+ * @tparam T
+ * @param rootNode
+ * @return
+ */
+template<class T>
+int BinarySearchTree<T>::maxDepthOfTree(const BinarySearchTree::Node *rootNode) {
+	if (rootNode == nullptr) {
+		// The depth of a single root node is 0, so the depth of the absence of one (null) must be -1.
+		return -1;
+	} else {
+		
+		// Left node depth
+		int leftDepth = maxDepthOfTree(rootNode->left);
+		// Right node depth
+		int rightDepth = maxDepthOfTree(rootNode->right);
+		
+		// Return the greater of the two plus one
+		return (leftDepth > rightDepth ? leftDepth : rightDepth) + 1;
+	}
+}
+
+/**
+ * Recursively defined method that adds a pointer to the payload on the specified node to the output array at the
+ * specified index. Then calls on its child nodes to do the same at their indices. The indices for the child storage
+ * are standard. If a parent node is stored at index k in a representational array, then its left child is stored at
+ * 2k+1.
  * @tparam T
  * @param node The parent node to store
  * @param array The output representational array to write to
  * @param nodeIndex The index to store the parent node at
  */
 template<class T>
-void BinarySearchTree<T>::addNodeToRepresentationalArray(const BinarySearchTree::Node *node, T *array,
+void BinarySearchTree<T>::addNodeToRepresentationalArray(const BinarySearchTree::Node *node, const T **array,
 														 const int nodeIndex) {
 	if (node != nullptr) {
-		array[nodeIndex] = node->payload;
+		array[nodeIndex] = &(node->payload);
 		addNodeToRepresentationalArray(node->left, array, 2 * nodeIndex + 1);
 		addNodeToRepresentationalArray(node->right, array, 2 * nodeIndex + 2);
+	} else {
+		array[nodeIndex] = nullptr;
 	}
 }
 
 /**
- * Returns an ordered array of the payloads stored within this BST.
+ * Returns an ordered array of pointers to the payloads stored within this BST. As usual the payloads are not to be
+ * modified here and the pointers to these payloads are constant.
  * @tparam T
  * @param returnLength A reference variable where the length of the returned array will be set into.
  * @return The return, in-order collection of payloads
  */
 template<class T>
-T *BinarySearchTree<T>::toInOrderArray(int &returnLength) {
+const T ** BinarySearchTree<T>::asInOrderArray(int &returnLength) {
 	const int arrLength = length();
-	auto *outputArray = new T[arrLength];
+	const T **outputArray = new T const *[arrLength];
 	// Variable to track the current write index in the array
 	int arrWriteIndex = 0;
 	
@@ -260,15 +298,43 @@ T *BinarySearchTree<T>::toInOrderArray(int &returnLength) {
  * written into the array.
  */
 template<class T>
-void BinarySearchTree<T>::addNodeToInOrderArray(Node *node, T *array, int &currentWriteIndex) {
+void BinarySearchTree<T>::addNodeToInOrderArray(Node *node, const T **array, int &currentWriteIndex) {
 	if (node != nullptr) {
 		addNodeToInOrderArray(node->left, array, currentWriteIndex);
 		
-		array[currentWriteIndex] = node->payload;
+		array[currentWriteIndex] = &(node->payload);
 		currentWriteIndex++;
 		
 		addNodeToInOrderArray(node->right, array, currentWriteIndex);
 	}
+}
+
+/**
+ * Copies all payloads specified in payloadPointers into a new array and returns it. This offers a way to take the
+ * results from calls to asInOrderArray(int&) and asRepresentationalArray(int&) and convert the T* arrays into T
+ * arrays with values that can be modified and managed by themselves. If payloadPointers contains nulls, they will be
+ * replaced with default constructed Ts and indiscernible from valid Payloads, so be careful. Manage that yourself.
+ * @tparam T
+ * @param payloadPointers
+ * @param length The length of the payloadPointers array
+ * @return An array of length 'length' with all the payloads specified by payloadPointers in it. In the same order as
+ * payloadPointers as well.
+ */
+template<class T>
+T *BinarySearchTree<T>::copyPayloads(const T **payloadPointers, const int &length) {
+	T *outputArray = new T[length];
+	
+	for (int i=0; i < length; i++) {
+		if (payloadPointers[i] != nullptr) {
+			outputArray[i] = *(payloadPointers[i]);
+		} else {
+			// This is slightly unpredictable behavior, so the user is warned about it in the comment block above
+			// If the pointer here is null, create a default constructed payload and add it
+			outputArray[i] = T();
+		}
+	}
+	
+	return outputArray;
 }
 
 /**
