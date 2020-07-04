@@ -18,8 +18,13 @@
  * nodes store in this BST.
  *
  * There should be no assumed organization of how the BST stores its payloads nor should there be any modification of
- * payload data directly in a way that would change it's relative position to other payloads. The BST is free to
- * reorganize nodes / re-structure the tree at any time it sees fit. TODO: Make specifications for modding payloads
+ * payload data directly in a way that would change its relative position to other payloads. The BST is free to
+ * reorganize nodes / re-structure the tree at any time it sees fit.
+ *
+ * Modifying Payloads: The only changes allowed to payloads are ones that don't change its relative position to other
+ * payloads. If any payload needs to be modified in a way that would change its position in the tree, it should be
+ * removed and re-inserted. To make a safe change to a payload one must use the updatePayload(T*, void(T*)). See
+ * method documentation for more information.
  *
  * @tparam T The type that this BST stores instances of in its nodes. T must be comparable, i.e. have the <, >, and ==
  * 	operators defined on it.
@@ -28,6 +33,7 @@
 template<class T>
 class BinarySearchTree {
 protected:
+	typedef int StorageKey;
 	/**
 	 * Represents a singular node in the binary search tree. Nodes hold some payload and point to two other nodes, a
 	 * left and a right.
@@ -42,29 +48,39 @@ protected:
 	class Node {
 		friend class BinarySearchTree;
 	private:
-		Node *left, *right;
-		const T payload;
+		/**
+		 * Not to be used except for within the updatePayload method on BinarySearchTree.
+		 */
+		T _unsafeMutablePayload;
+	protected:
+		Node *_left, *_right;
+		const T _payload;
 	public:
 		explicit Node(const T &newPayload);
 		~Node();
-		
-		//Some operators to compare payloads across payloads
-		bool operator<(const Node &other);
-		bool operator>(const Node &other);
-		bool operator==(const Node &other);
 	};
 	
+	/**
+	 * Represents the comparison between one payload and another
+	 */
+	enum PayloadComparison {GREATER_THAN = 1, LESS_THAN = -1, EQUAL = 0};
+	
+private:
+	int (*_storageKeyFor)(T *payload);
 	
 protected:
 	Node *root;
-	void deleteBinaryTree(Node *root);
-	int lengthOfTree(const Node *rootNode);
-	int maxDepthOfTree(const Node *rootNode);
-	void addNodeToRepresentationalArray(const Node *node, const T **array, int nodeIndex);
-	void addNodeToInOrderArray(Node *node, const T **array, int &currentWriteIndex);
+	void _deleteBinaryTree(Node *root);
+	int _lengthOfTree(const Node *rootNode);
+	int _maxDepthOfTree(const Node *rootNode);
+	void _addNodeToRepresentationalArray(const Node *node, const T **array, int nodeIndex);
+	void _addNodeToInOrderArray(Node *node, const T **array, int &currentWriteIndex);
+	
+	PayloadComparison _comparePayloads(T *first, T *second);
 	
 public:
 	BinarySearchTree();
+	explicit BinarySearchTree(StorageKey (*storageKeyFor)(T *payload));
 	~BinarySearchTree();
 	
 	const T *insert(const T &payload);
@@ -73,6 +89,9 @@ public:
 	const T *find(const T &payload);
 	bool empty();
 	int length();
+	
+	// Modifying payloads
+	bool updatePayload(T *payloadToUpdate, void(*payloadUpdater)(T *payloadToUpdate));
 	
 	// Exporting
 	const T **asRepresentationalArray(int &returnLength);

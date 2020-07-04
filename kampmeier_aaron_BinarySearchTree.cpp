@@ -15,11 +15,29 @@
 #include "kampmeier_aaron_BinarySearchTree.h"
 
 /**
- * Constructor for BinarySearchTree. Creates an empty binary search tree with no root node.
+ * Constructor for BinarySearchTree. Creates an empty binary search tree with no root node. Tries to generate an
+ * automatic storageKeyFor(T*) function but if it fails you will need to use the other constructor and provide one
+ * yourself.
  * @tparam T
  */
 template<class T>
 BinarySearchTree<T>::BinarySearchTree() {
+	// Calls the other constructor with a generated function that tries to take the integer representation of a payload.
+	this([](T* val) {return (StorageKey) *val;});
+}
+
+/**
+ * Constructs a binary search tree that stores payloads. Payloads are organized in the tree using storage keys.
+ * @tparam T
+ * @param storageKeyFor A function that returns the storage key of a given payload. Should return the exact same
+ * storage key every time if the same payload is passed in. A good storage key would probably be the hash of an
+ * immutable member on the payload or some id. If you're storing a type that is already numeric (can be converted to
+ * an int) then use the default BinarySearchTree() constructor which will generate a storageKeyFor(T*) function for
+ * you by attempting to cast the payload.
+ */
+template<class T>
+BinarySearchTree<T>::BinarySearchTree(StorageKey (*storageKeyFor)(T *)) {
+	_storageKeyFor = storageKeyFor;
 	root = nullptr;
 }
 
@@ -30,6 +48,27 @@ BinarySearchTree<T>::BinarySearchTree() {
 template<class T>
 BinarySearchTree<T>::~BinarySearchTree() {
 	empty();
+}
+
+/**
+ * Compares two payloads using their storage keys and returns a PayloadComparison
+ * @tparam T
+ * @param first
+ * @param second
+ * @return
+ */
+template<class T>
+typename BinarySearchTree<T>::PayloadComparison BinarySearchTree<T>::_comparePayloads(T *first, T *second) {
+	StorageKey firstKey = _storageKeyFor(first);
+	StorageKey secondKey = _storageKeyFor(second);
+	
+	if (firstKey < secondKey) {
+		return BinarySearchTree::LESS_THAN;
+	} else if (firstKey > secondKey) {
+		return BinarySearchTree::GREATER_THAN;
+	} else if (firstKey == secondKey) {
+		return BinarySearchTree::EQUAL;
+	}
 }
 
 /**
@@ -48,19 +87,20 @@ const T *BinarySearchTree<T>::insert(const T &payload) {
 	// of storing a pointer to the node I'm currently checking, I'm storing a pointer to the pointer on the parent
 	// node that points to the child I'm checking. This way I can modify the parent's child pointer value if I want
 	// to add my node in there. Thus, the current node I'm checking against is given by the double de-reference of
-	// parentConnection (**parentConnection) and the left child is **parentConnection.left or (*parentConnection)->left
+	// parentConnection (**parentConnection) and the _left child is **parentConnection._left or (*parentConnection)->_left
  	Node **parentConnection = &root;
 	while (*parentConnection != nullptr) {
-		 if (payload < (*parentConnection)->payload) {
+		PayloadComparison comparison = _comparePayloads(payload, (*parentConnection)->_payload);
+		 if (  payload < (*parentConnection)->_payload) {
 			// The payload is less than the current node's payload, move down to the left
-			parentConnection = &((*parentConnection)->left);
-		} else if (payload > (*parentConnection)->payload) {
+			parentConnection = &((*parentConnection)->_left);
+		} else if (payload > (*parentConnection)->_payload) {
 		 	// The payload is greater than the current node's payload, now check the right child
-		 	parentConnection = &((*parentConnection)->right);
-		 } else if (payload == (*parentConnection)->payload) {
+		 	parentConnection = &((*parentConnection)->_right);
+		 } else if (payload == (*parentConnection)->_payload) {
 		 	// The new payload is equal to this node's payload, so cancel the insertion and just return a pointer to
 		 	// this payload
-			 return &((*parentConnection)->payload);
+			 return &((*parentConnection)->_payload);
 		 } else {
 		 	exit(NODE_COMPARISON_FAILURE_EXIT);
 		 }
@@ -68,7 +108,7 @@ const T *BinarySearchTree<T>::insert(const T &payload) {
 	
 	// Reached the end of the list and didn't find any previously added equal payloads, so just add it here
 	*parentConnection = new Node(payload);
-	return &((*parentConnection)->payload);
+	return &((*parentConnection)->_payload);
 }
 
 /**
@@ -88,27 +128,27 @@ bool BinarySearchTree<T>::remove(const T &payloadToRemove) {
 	Node **parentConnection = &root;
 	
 	while (currentNode != nullptr) {
-		if (payloadToRemove < currentNode->payload) {
+		if (payloadToRemove < currentNode->_payload) {
 			// Go to the left side
-			parentConnection = &(currentNode->left);
-			currentNode = currentNode->left;
-		} else if (payloadToRemove > currentNode->payload) {
+			parentConnection = &(currentNode->_left);
+			currentNode = currentNode->_left;
+		} else if (payloadToRemove > currentNode->_payload) {
 			// Go to the right side
-			parentConnection = &(currentNode->right);
-			currentNode = currentNode->right;
-		} else if (payloadToRemove == currentNode->payload) {
+			parentConnection = &(currentNode->_right);
+			currentNode = currentNode->_right;
+		} else if (payloadToRemove == currentNode->_payload) {
 			// This is the one to delete
 			// Three scenarios for deletion:
 			// 1. Node is a leaf
-			if (currentNode->left == nullptr && currentNode->right == nullptr) {
+			if (currentNode->_left == nullptr && currentNode->_right == nullptr) {
 				// Just delete it
 				*parentConnection = nullptr;
 				delete currentNode;
 			}
 			// 2. Node has one child
-			else if (currentNode->left == nullptr || currentNode->right == nullptr) {
+			else if (currentNode->_left == nullptr || currentNode->_right == nullptr) {
 				// Connect the parent's connection to its one child
-				*parentConnection = currentNode->left == nullptr ? currentNode->right : currentNode->left;
+				*parentConnection = currentNode->_left == nullptr ? currentNode->_right : currentNode->_left;
 				
 				// Delete the current node
 				delete currentNode;
@@ -118,24 +158,24 @@ bool BinarySearchTree<T>::remove(const T &payloadToRemove) {
 				//To delete a node with two children, we replace it with its in order successor. The successor
 				// necessarily does not have a left child
 				//To find the in order successor, we will jump to the right child and then traverse down the left side
-				Node *inOrderSuccessor = currentNode->right;
-				Node **inOrderSuccessorParentConnection = &(currentNode->right);
-				while (inOrderSuccessor->left != nullptr) {
-					inOrderSuccessorParentConnection = &(inOrderSuccessor->left);
-					inOrderSuccessor = inOrderSuccessor->left;
+				Node *inOrderSuccessor = currentNode->_right;
+				Node **inOrderSuccessorParentConnection = &(currentNode->_right);
+				while (inOrderSuccessor->_left != nullptr) {
+					inOrderSuccessorParentConnection = &(inOrderSuccessor->_left);
+					inOrderSuccessor = inOrderSuccessor->_left;
 				}
 				
 				// Move the parent's connection over to the successor
 				*parentConnection = inOrderSuccessor;
 				
 				// Replace the old parent connection to the successor with the successor's right child
-				*inOrderSuccessorParentConnection = inOrderSuccessor->right;
+				*inOrderSuccessorParentConnection = inOrderSuccessor->_right;
 				
 				// Move the left child from the current node over
-				inOrderSuccessor->left = currentNode->left;
+				inOrderSuccessor->_left = currentNode->_left;
 				
 				// Move the right child over
-				inOrderSuccessor->right = currentNode->right;
+				inOrderSuccessor->_right = currentNode->_right;
 				
 				// Now delete the old node because everything has been moved over
 				delete currentNode;
@@ -174,15 +214,15 @@ const T * BinarySearchTree<T>::find(const T &payload) {
 	Node *checkingAgainst = root;
 	
 	while (checkingAgainst != nullptr) {
-		if (checkingAgainst->payload == payload) {
+		if (checkingAgainst->_payload == payload) {
 			// The specified payload and this node's payload are the same, return this payload pointer
-			return &(checkingAgainst->payload);
-		} else if (payload < checkingAgainst->payload) {
+			return &(checkingAgainst->_payload);
+		} else if (payload < checkingAgainst->_payload) {
 			// Payload is less, go check the left tree
-			checkingAgainst = checkingAgainst->left;
-		} else if (payload > checkingAgainst->payload) {
+			checkingAgainst = checkingAgainst->_left;
+		} else if (payload > checkingAgainst->_payload) {
 			// Payload is bigger, go check right tree
-			checkingAgainst = checkingAgainst->right;
+			checkingAgainst = checkingAgainst->_right;
 		} else {
 			exit(NODE_COMPARISON_FAILURE_EXIT);
 		}
@@ -206,7 +246,7 @@ const T **BinarySearchTree<T>::asRepresentationalArray(int &returnLength) {
 	// The length of the rep array is 2^(max depth) + 2^(max depth - 1) + ... + 2^0 which is a geometric series with
 	// r=2 and a1 = 1. The number of terms, n, in the series is maxDepth + 1. The geometric series formula is S_n = a1 *
 	// (1-r^n) / (1-r).
-	const int maxDepth = maxDepthOfTree(root);
+	const int maxDepth = _maxDepthOfTree(root);
 	const int arrLength = 1 * (1 - pow(2,maxDepth + 1)) / (1 - 2);
 	if (arrLength < 1) {
 		// No elements in the BST, return null
@@ -215,7 +255,7 @@ const T **BinarySearchTree<T>::asRepresentationalArray(int &returnLength) {
 	const T **outputArray = new T const *[arrLength];
 	
 	//TODO: Make this array a list of pointers to payloads, because values in here can and should be NULL
-	addNodeToRepresentationalArray(root, outputArray, 0);
+	_addNodeToRepresentationalArray(root, outputArray, 0);
 	
 	returnLength = arrLength;
 	return outputArray;
@@ -229,16 +269,16 @@ const T **BinarySearchTree<T>::asRepresentationalArray(int &returnLength) {
  * @return
  */
 template<class T>
-int BinarySearchTree<T>::maxDepthOfTree(const BinarySearchTree::Node *rootNode) {
+int BinarySearchTree<T>::_maxDepthOfTree(const BinarySearchTree::Node *rootNode) {
 	if (rootNode == nullptr) {
 		// The depth of a single root node is 0, so the depth of the absence of one (null) must be -1.
 		return -1;
 	} else {
 		
 		// Left node depth
-		int leftDepth = maxDepthOfTree(rootNode->left);
+		int leftDepth = _maxDepthOfTree(rootNode->_left);
 		// Right node depth
-		int rightDepth = maxDepthOfTree(rootNode->right);
+		int rightDepth = _maxDepthOfTree(rootNode->_right);
 		
 		// Return the greater of the two plus one
 		return (leftDepth > rightDepth ? leftDepth : rightDepth) + 1;
@@ -256,12 +296,12 @@ int BinarySearchTree<T>::maxDepthOfTree(const BinarySearchTree::Node *rootNode) 
  * @param nodeIndex The index to store the parent node at
  */
 template<class T>
-void BinarySearchTree<T>::addNodeToRepresentationalArray(const BinarySearchTree::Node *node, const T **array,
-														 const int nodeIndex) {
+void BinarySearchTree<T>::_addNodeToRepresentationalArray(const BinarySearchTree::Node *node, const T **array,
+														  int nodeIndex) {
 	if (node != nullptr) {
-		array[nodeIndex] = &(node->payload);
-		addNodeToRepresentationalArray(node->left, array, 2 * nodeIndex + 1);
-		addNodeToRepresentationalArray(node->right, array, 2 * nodeIndex + 2);
+		array[nodeIndex] = &(node->_payload);
+		_addNodeToRepresentationalArray(node->_left, array, 2 * nodeIndex + 1);
+		_addNodeToRepresentationalArray(node->_right, array, 2 * nodeIndex + 2);
 	} else {
 		array[nodeIndex] = nullptr;
 	}
@@ -272,7 +312,7 @@ void BinarySearchTree<T>::addNodeToRepresentationalArray(const BinarySearchTree:
  * modified here and the pointers to these payloads are constant.
  * @tparam T
  * @param returnLength A reference variable where the length of the returned array will be set into.
- * @return The return, in-order collection of payloads
+ * @return The in-order collection of payload pointers
  */
 template<class T>
 const T ** BinarySearchTree<T>::asInOrderArray(int &returnLength) {
@@ -281,7 +321,7 @@ const T ** BinarySearchTree<T>::asInOrderArray(int &returnLength) {
 	// Variable to track the current write index in the array
 	int arrWriteIndex = 0;
 	
-	addNodeToInOrderArray(root, outputArray, arrWriteIndex);
+	_addNodeToInOrderArray(root, outputArray, arrWriteIndex);
 	
 	returnLength = arrLength;
 	return outputArray;
@@ -293,26 +333,26 @@ const T ** BinarySearchTree<T>::asInOrderArray(int &returnLength) {
  * currentWriteIndex variable that increments every time we write to the array.
  * @tparam T
  * @param node
- * @param array The array to write into. Must be at least of length lengthOfTree(node).
+ * @param array The array to write into. Must be at least of length _lengthOfTree(node).
  * @param currentWriteIndex A reference to the write index to start writing from, will be updated as more values are
  * written into the array.
  */
 template<class T>
-void BinarySearchTree<T>::addNodeToInOrderArray(Node *node, const T **array, int &currentWriteIndex) {
+void BinarySearchTree<T>::_addNodeToInOrderArray(Node *node, const T **array, int &currentWriteIndex) {
 	if (node != nullptr) {
-		addNodeToInOrderArray(node->left, array, currentWriteIndex);
+		_addNodeToInOrderArray(node->_left, array, currentWriteIndex);
 		
-		array[currentWriteIndex] = &(node->payload);
+		array[currentWriteIndex] = &(node->_payload);
 		currentWriteIndex++;
 		
-		addNodeToInOrderArray(node->right, array, currentWriteIndex);
+		_addNodeToInOrderArray(node->_right, array, currentWriteIndex);
 	}
 }
 
 /**
  * Copies all payloads specified in payloadPointers into a new array and returns it. This offers a way to take the
  * results from calls to asInOrderArray(int&) and asRepresentationalArray(int&) and convert the T* arrays into T
- * arrays with values that can be modified and managed by themselves. If payloadPointers contains nulls, they will be
+ * arrays with values that can be modified and managed themselves. If payloadPointers contains nulls, they will be
  * replaced with default constructed Ts and indiscernible from valid Payloads, so be careful. Manage that yourself.
  * @tparam T
  * @param payloadPointers
@@ -345,7 +385,7 @@ T *BinarySearchTree<T>::copyPayloads(const T **payloadPointers, const int &lengt
  */
 template<class T>
 bool BinarySearchTree<T>::empty() {
-	deleteBinaryTree(root);
+	_deleteBinaryTree(root);
 	root = nullptr;
 	return true;
 }
@@ -357,10 +397,10 @@ bool BinarySearchTree<T>::empty() {
  * @param startingNode The root node to start deletion from
  */
 template<class T>
-void BinarySearchTree<T>::deleteBinaryTree(Node *startingNode) {
+void BinarySearchTree<T>::_deleteBinaryTree(Node *startingNode) {
 	if (startingNode != nullptr) {
-		deleteBinaryTree(startingNode->left);
-		deleteBinaryTree(startingNode->right);
+		_deleteBinaryTree(startingNode->_left);
+		_deleteBinaryTree(startingNode->_right);
 		delete startingNode;
 	} else {
 		// Do nothing, the node is null
@@ -374,7 +414,7 @@ void BinarySearchTree<T>::deleteBinaryTree(Node *startingNode) {
  */
 template<class T>
 int BinarySearchTree<T>::length() {
-	return lengthOfTree(root);
+	return _lengthOfTree(root);
 }
 
 /**
@@ -384,15 +424,34 @@ int BinarySearchTree<T>::length() {
  * @return The number of elements in this tree.
  */
 template<class T>
-int BinarySearchTree<T>::lengthOfTree(const BinarySearchTree::Node *rootNode) {
+int BinarySearchTree<T>::_lengthOfTree(const BinarySearchTree::Node *rootNode) {
 	if (rootNode == nullptr) {
 		return 0;
 	} else {
-		return 1 + lengthOfTree(rootNode->left) + lengthOfTree(rootNode->right); // +1 for the current node
+		return 1 + _lengthOfTree(rootNode->_left) + _lengthOfTree(rootNode->_right); // +1 for the current node
 	}
 }
 
+/// Updating payloads
 
+/**
+ * Handles the process of updating the information contained inside a payload. As stated in the BST documentation,
+ * any update to a payload that would change its position in thw tree (considered an 'unsafe update') is discouraged.
+ * Use this method to make safe updates to payloads.
+ * @tparam T
+ * @param payloadToUpdate Pointer to the payload in this tree to update
+ * @param payloadUpdater A function that takes in a payload pointer and updates its value. This function will be
+ * monitored and if it makes an unsafe update that changes the relative position of the payload, then refactoring
+ * will occur. Refactoring is a process in which the updated payload will be removed from the tree and then
+ * re-inserted back into its new, correct spot.
+ * @return Whether refactoring was necessary.
+ */
+template<class T>
+bool BinarySearchTree<T>::updatePayload(T *payloadToUpdate, void (*payloadUpdater)(T *)) {
+	// To update, we will
+	
+	return false;
+}
 
 
 /**
@@ -401,23 +460,9 @@ int BinarySearchTree<T>::lengthOfTree(const BinarySearchTree::Node *rootNode) {
  * @param payload
  */
 template<class T>
-BinarySearchTree<T>::Node::Node(const T &newPayload): payload(newPayload) {
-	left = right = nullptr;
-}
-
-template<class T>
-bool BinarySearchTree<T>::Node::operator<(const BinarySearchTree::Node &other) {
-	return this->payload < other.payload;
-}
-
-template<class T>
-bool BinarySearchTree<T>::Node::operator>(const BinarySearchTree::Node &other) {
-	return this->payload > other.payload;
-}
-
-template<class T>
-bool BinarySearchTree<T>::Node::operator==(const BinarySearchTree::Node &other) {
-	return this->payload == other.payload;
+BinarySearchTree<T>::Node::Node(const T &newPayload): _payload(newPayload) {
+	_unsafeMutablePayload = _payload;
+	_left = _right = nullptr;
 }
 
 /**
