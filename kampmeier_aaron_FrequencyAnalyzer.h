@@ -24,7 +24,7 @@
  */
 class FrequencyAnalyzer {
 
-private:
+public:
 	/**
 	 * Represents the results of a FrequencyAnalyzer analysis
 	 */
@@ -47,7 +47,7 @@ private:
 			
 		public:
 			const char *word;
-			const unsigned long hash;
+			unsigned long hash;
 			int frequency;
 			
 			/**
@@ -62,33 +62,36 @@ private:
 			explicit WordFrequency(const char *word);
 			~WordFrequency();
 			
+			/// Move handling
 			/**
-			 * Compares this word frequency with another one. Compares them by their hash to check if their words are
-			 * equal. Note that the frequency does not affect equality.
-			 * @param other
+			 * Move constructor. Moves management of word over to this object from wordFreq.
+			 * @param wordFreq
+			 */
+			WordFrequency(WordFrequency &&wordFreq);
+			
+			/**
+			 * Move assignment operator. Moves just like the move constructor does.
+			 * @param wordFreq
 			 * @return
 			 */
-			bool operator<(const WordFrequency &other);
+			WordFrequency &operator=(WordFrequency &&wordFreq);
+			
+			// Copy handling
+			WordFrequency(const WordFrequency &wordFreq);
+			WordFrequency &operator=(const WordFrequency &wordFreq);
+			
 			/**
-			 * Compares this word frequency with another one. Compares them by their hash to check if their words are
-			 * equal. Note that the frequency does not affect equality.
-			 * @param other
-			 * @return
+			 * Increments the frequency value by one to signal another word instance found
 			 */
-			bool operator>(const WordFrequency &other);
-			/**
-			 * Compares this word frequency with another one. Compares them by their hash to check if their words are
-			 * equal. Note that the frequency does not affect equality.
-			 * @param other
-			 * @return
-			 */
-			bool operator==(const WordFrequency &other);
+			void incrementByOne();
 			
 		};
 		
 	private:
 		BinarySearchTree<WordFrequency> *_wordFrequenciesTree;
 		const int _fileWordCount;
+		
+		static const char *copyString(const char *inputString);
 		
 	public:
 		const char * const inputFile;
@@ -112,11 +115,18 @@ private:
 		int totalUniqueWords() const;
 		
 		/**
-		 * Returns the frequency of the specified word
+		 * Returns the frequency of the specified word. Case-insensitive.
 		 * @param word The word to check the frequency of
 		 * @return
 		 */
 		int frequencyOf(const char *word) const;
+		
+		/**
+		 * Returns all of the words and their frequencies in the file in no specific order.
+		 * @param returnLength A reference to a variable that will store the length of the returned array.
+		 * @return An array of WordFrequency pointers.
+		 */
+		const WordFrequency **allWordFrequencies(int &returnLength);
 		
 		/**
 		 * Returns an array of pointers to word frequency objects in order of increasing frequency
@@ -139,6 +149,21 @@ private:
 		 */
 		bool exportFrequenciesToCSV(char *outputFilePath);
 	};
+	
+private:
+	/**
+	 * Increments the frequency of the specified wordFrequency by one
+	 * @param wordFrequency
+	 */
+	static void _incrementWordFrequencyByOne(FrequencyAnalysisResults::WordFrequency &wordFrequency);
+	
+	/**
+	 * Registers a null-terminated string inside the tree. If it does not exist in the tree, an entry with
+	 * frequency=1 is added, if it does exist, then frequency is incremented by one.
+	 * @param word
+	 * @param tree
+	 */
+	static void _registerWordWithTree(char *word, BinarySearchTree<FrequencyAnalysisResults::WordFrequency> *tree);
 public:
 	FrequencyAnalyzer();
 	~FrequencyAnalyzer();
@@ -148,10 +173,13 @@ public:
 	 * assumed that when the function returns the analysis is over. When the analysis is completed, completionHandler
 	 * will be called with the results object which can be further queried for insight.
 	 * @param inputFilePath The path to the file to perform analysis on
-	 * @param completionHandler A pointer to a function that just takes in a FrequencyAnalysisResults object.
+	 * @param completionHandler A pointer to a function that just takes in a FrequencyAnalysisResults object pointer.
+	 * The Results pointer can be NULL if the analysis failed.
 	 */
-	void analyze(const char *inputFilePath, void (*completionHandler)(FrequencyAnalysisResults));
+	void analyze(const char *inputFilePath, void (*completionHandler)(FrequencyAnalysisResults *));
 };
 
+
+char *concatStrings(char *str1, char *str2);
 
 #endif //ASSIGNMENT_4_KAMPMEIER_AARON_FREQUENCYANALYZER_H
