@@ -67,14 +67,14 @@ public:
 			 * Move constructor. Moves management of word over to this object from wordFreq.
 			 * @param wordFreq
 			 */
-			WordFrequency(WordFrequency &&wordFreq);
+			WordFrequency(WordFrequency &&wordFreq) noexcept ;
 			
 			/**
 			 * Move assignment operator. Moves just like the move constructor does.
 			 * @param wordFreq
 			 * @return
 			 */
-			WordFrequency &operator=(WordFrequency &&wordFreq);
+			WordFrequency &operator=(WordFrequency &&wordFreq) noexcept ;
 			
 			// Copy handling
 			WordFrequency(const WordFrequency &wordFreq);
@@ -89,9 +89,21 @@ public:
 		
 	private:
 		BinarySearchTree<WordFrequency> *_wordFrequenciesTree;
+		BinarySearchTree<WordFrequency> *_wordFrequenciesTreeOrdered;
 		const int _fileWordCount;
 		
+		/**
+		 * Copies string and returns a pointer to the new copied string.
+		 * @param inputString
+		 * @return
+		 */
 		static const char *copyString(const char *inputString);
+		
+		/**
+		 * Returns a basic summary header for the file analysis. Can be used for console output or file output.
+		 * @return
+		 */
+		const char *summaryHeader();
 		
 	public:
 		const char * const inputFile;
@@ -136,18 +148,24 @@ public:
 		const WordFrequency **wordsOrderedByFrequency(int &returnLength);
 		
 		/**
+		 * Returns a short blurb summary of the file analyzed.
+		 * @return A pointer to a longer string, must delete[] manually.
+		 */
+		const char *textSummary();
+		
+		/**
 		 * Exports a full report of the frequency analysis to a file for analysis.
 		 * @param outputFilePath
 		 * @return Successful
 		 */
-		bool exportReportTo(char *outputFilePath);
+		bool exportReportTo(const char *outputFilePath);
 		
 		/**
 		 * Exports all the frequencies of words to a CSV file.
 		 * @param outputFilePath
 		 * @return Successful
 		 */
-		bool exportFrequenciesToCSV(char *outputFilePath);
+		bool exportFrequenciesToCSV(const char *outputFilePath);
 	};
 	
 private:
@@ -180,6 +198,6 @@ public:
 };
 
 
-char *concatStrings(char *str1, char *str2);
+char *concatStrings(const char *str1, const char *str2);
 
 #endif //ASSIGNMENT_4_KAMPMEIER_AARON_FREQUENCYANALYZER_H

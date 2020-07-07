@@ -6,6 +6,7 @@
 //
 
 #include <iostream>
+#include <dirent.h>
 #include "kampmeier_aaron_BinarySearchTree.h"
 #include "kampmeier_aaron_FrequencyAnalyzer.h"
 
@@ -142,34 +143,83 @@ int main(int argc, char **argv) {
 	/// Test frequency analysis
 	cout << "\n\nTesting frequency analysis..." << endl;
 	FrequencyAnalyzer analyzer;
-	char testFile[] = "Tests/Cases/TestB.txt";
-	void (*completionHandler)(FrequencyAnalyzer::FrequencyAnalysisResults*) = []
-			(FrequencyAnalyzer::FrequencyAnalysisResults *results) {
-		if (results == nullptr) {
-			cout << "Analysis failed" << endl;
-			return;
-		}
-		
-		cout << "Completed frequency analysis on file " << results->inputFile << endl;
+	
+	
+	char testDir[] = "Tests/Cases/";
+	// Since I couldn't get std::filesystem to work I am using these POSIX file commands from here: https://pubs.opengroup.org/onlinepubs/7908799/xsh/readdir.html
+	DIR *directoryPtr = opendir(testDir);
+	dirent *dirEntry;
+	errno = 0;
+	
+	while ((dirEntry = readdir(directoryPtr)) != nullptr) {
+		// Skip the "." and ".." entries in the directory if they exist
+		if ((strcmp(dirEntry->d_name, ".") != 0) && (strcmp(dirEntry->d_name, "..") != 0)) {
+			
+			char *testFile = concatStrings(testDir, dirEntry->d_name);
+			
+			void (*completionHandler)(FrequencyAnalyzer::FrequencyAnalysisResults*) = []
+					(FrequencyAnalyzer::FrequencyAnalysisResults *results) {
+				if (results == nullptr) {
+					cout << "Analysis failed" << endl;
+					return;
+				}
+				
+				cout << "Completed frequency analysis on file " << results->inputFile << endl;
+				
+				cout << "Frequency of 'the': " << results->frequencyOf("the") << endl;
+				cout << "Frequency of 'baz': " << results->frequencyOf("baz") << endl;
+				cout << "Frequency of 'quick': " << results->frequencyOf("quick") << endl;
+				cout << "Frequency of 'dog': " << results->frequencyOf("dog") << endl;
+				cout << "Frequency of 'pglaf': " << results->frequencyOf("pGlAF") << endl;
+				cout << "Frequency of '3/4': " << results->frequencyOf("3/4") << endl;
+				
+				// Output to a file
+				char testOutputDir[] = "Tests/Testing Output/";
+				const char *inputFile = (results->inputFile) + 12;
+				const char *outputFilePath = concatStrings(testOutputDir, inputFile);
+				
+				// Output to file
+				const char *outputAnalysisPath = concatStrings(outputFilePath, ".analysis.txt");
+				results->exportReportTo(outputAnalysisPath);
+				
+				// Output to csv
+				const char *outputCsvPath = concatStrings(outputFilePath, ".csv");
+				results->exportFrequenciesToCSV(outputCsvPath);
+				
+//				int returnLength;
+//				auto allWords = results->allWordFrequencies(returnLength);
+//				cout << "\nFrequency of all words: " << endl;
+//				for (int i=0; i < returnLength; i++) {
+//					cout << allWords[i]->word << ": " << allWords[i]->frequency << "" << endl;
+//				}
+//
+//				cout << "\nWords ordered by Frequency: " << endl;
+//				auto wordsByFreq = results->wordsOrderedByFrequency(returnLength);
+//				for (int i=0; i < returnLength; i++) {
+//					cout << wordsByFreq[i]->word << ": " << wordsByFreq[i]->frequency << "" << endl;
+//				}
 
-		cout << "Frequency of 'the': " << results->frequencyOf("the") << endl;
-		cout << "Frequency of 'baz': " << results->frequencyOf("baz") << endl;
-		cout << "Frequency of 'quick': " << results->frequencyOf("quick") << endl;
-		cout << "Frequency of 'dog': " << results->frequencyOf("dog") << endl;
-		cout << "Frequency of 'pglaf': " << results->frequencyOf("pGlAF") << endl;
-		
-		int returnLength;
-		auto allWords = results->allWordFrequencies(returnLength);
-		
-		cout << "\nFrequency of all words: " << endl;
-		for (int i=0; i < returnLength; i++) {
-			cout << allWords[i]->word << ": " << allWords[i]->frequency << "" << endl;
+//				delete [] allWords;
+				delete [] outputFilePath;
+				delete [] outputCsvPath;
+				delete [] outputAnalysisPath;
+				delete results;
+			};
+			
+			analyzer.analyze(testFile, completionHandler);
+			
+			delete [] testFile;
 		}
-		
-		delete [] allWords;
-		delete results;
-	};
-	analyzer.analyze(testFile, completionHandler);
+	}
+	
+	if (errno != 0) {
+		// There was an error reading the directory
+		cerr << "There was an error reading the " << testDir << " directory: " << errno << endl;
+	}
+	
+	closedir(directoryPtr);
+	
+	cout << "Tests completed, manually check output files now." << endl;
 	
 	return 0;
 }

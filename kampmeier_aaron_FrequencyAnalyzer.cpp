@@ -38,6 +38,11 @@ void FrequencyAnalyzer::analyze(const char *inputFilePath, void (*completionHand
 	char *currentReadingWord = nullptr;
 	int wordLength = 0;
 	
+	// Support for utf-8 char
+	unsigned int utf8Char = 0;
+	int utf8CharByteIndex = 0;
+	int utf8CharByteLength = 0;
+	
 	int fileWordCount = 0;
 	
 	// Read the file in chunks
@@ -55,9 +60,52 @@ void FrequencyAnalyzer::analyze(const char *inputFilePath, void (*completionHand
 			if (isalpha(readBuffer[readIndex]) || readBuffer[readIndex] == '\'') {
 				// This could be the start or middle of a word, increment word length by 1
 				wordLength++;
-			} else {
+			}
+			
+			// All of this utf-8 code has been shelved because I realized it introduced more problems than solutions.
+			// The nature of it trying to read in a utf-8 char by reading it along with the movement of readIndex
+			// means that once it reaches the end of a utf-8 char and realizes that the read char is not actually
+			// wanted as part of a word, then there's no way to go back and change wordLength to avoid the utf-8 char
+			
+//			// Check if it's a utf-8 wide character
+//			else if (readBuffer[readIndex] < 0) {
+//				// It is probably a utf-8 character so check how many buffer spots to skip
+//				// The only utf-8 characters we care about are the general punctuation ones which are three bytes
+//				// long so check if that's what we have
+//
+//				// Check if we are currently reading in a wide character
+//				if (utf8CharByteIndex > 0) {
+//					// Splice in the next bits
+//					unsigned char mask = 0b00111111;
+//					unsigned int nextBits = ((unsigned int) readBuffer[readIndex] & mask) << ((utf8CharByteLength -
+//							utf8CharByteIndex) * 6);
+//
+//					if () {
+//						utf8CharByteIndex = 0;
+//						utf8CharByteLength = 0;
+//					}
+//				}
+//
+//				unsigned char mask = 0b11110000;
+//				unsigned char maskedChar = readBuffer[readIndex] & mask;
+//				if (maskedChar == 0b11100000) {
+//					// It is a three byte wide utf-8 char, try to read in the full utf-8 character which should take
+//					// up 11 bits
+//					utf8Char = 0;
+//					utf8CharByteLength = 3;
+//
+//					// Splice in the first 4 bits into the 12-15 bits in the utf8Char with zero-indexing
+//					// First flip the mask and get the actual utf-8 char bits
+//					mask = ~mask;
+//					unsigned int first4Bits = ((unsigned int) readBuffer[readIndex] & mask) << 12;
+//					utf8Char = utf8Char | first4Bits;
+//					utf8CharByteIndex = 1;
+//					// Go on to read more characters
+//				}
+//			}
+			else {
 				// Not part of a word, so the end of it
-				if (wordLength > 0) {
+				if (wordLength > 0 || currentReadingWord != nullptr) {
 					// Check if there is currently a word being read, possibly left over from a buffer change
 					if (currentReadingWord != nullptr) {
 						// Add the left-over word to the word currently being read in from buffer
@@ -150,7 +198,7 @@ FrequencyAnalyzer::FrequencyAnalysisResults::FrequencyAnalysisResults(const char
 		: _fileWordCount(fileWordCount), analyzedOn(time(nullptr)), inputFile(copyString(inputFile)),
 		_wordFrequenciesTree
 		(wordFrequencies) {
-	
+	_wordFrequenciesTreeOrdered = nullptr;
 }
 
 /**
@@ -205,19 +253,129 @@ FrequencyAnalyzer::FrequencyAnalysisResults::allWordFrequencies(int &returnLengt
 
 const FrequencyAnalyzer::FrequencyAnalysisResults::WordFrequency **
 FrequencyAnalyzer::FrequencyAnalysisResults::wordsOrderedByFrequency(int &returnLength) {
-	// Generate another tree that stores the WordFrequency objects by their frequency but still has to be unique
-	auto getFrequency = [](const WordFrequency &val) -> BinarySearchTree<WordFrequency>::StorageKey {
+	BinarySearchTree<WordFrequency> *frequencyOrderedTree = _wordFrequenciesTreeOrdered;
 	
-	};
-	auto frequencyOrderedTree = new BinarySearchTree<WordFrequency>(getFrequency);
+	if (frequencyOrderedTree == nullptr) {
+		// Generate another tree that stores the WordFrequency objects by their frequency but still has to be unique
+		
+		auto getUniqueFrequencyKey = [](const WordFrequency &val) -> BinarySearchTree<WordFrequency>::StorageKey {
+			typedef BinarySearchTree<WordFrequency>::StorageKey StorageKey;
+			//Combine the frequency into the hash value to get a new "freq + hash" storage key that still maintains a
+			// unique hash for every word but is now ordered by frequency
+			
+			//The storage key (a long) for the normal tree is the hash of the word. The hash is unlikely to take up all
+			// 8 bytes of the long, so we will cut off the most significant 4 bytes of the hash and splice the integer
+			// value of the frequency (4 bytes) into its place. This allows us to order by frequency (the most
+			// significant 4 bytes of the storage key) while still having part of the hash trailing the frequency (the
+			// least significant 4 bytes of the storage key) to uniquely identify this word and its frequency apart from
+			// others.
+			
+			// The byte index at which the frequency will be spliced into, should be 4 normally. So bytes 0-3 are part of
+			// the hash and bytes 4-7 are the frequency.
+			int maskStart = sizeof(BinarySearchTree<WordFrequency>::StorageKey) - sizeof(int);
+			
+			if (maskStart < 2) {
+				// The frequency cannot take up the whole storage key, some of the hash must be left
+				exit(STORAGE_KEY_HASHING_FAILED_EXIT);
+			}
+			
+			// Mask the hash: cut away the most significant 4 bytes
+			long hashMask = ~(((1ul << (sizeof(int) * 8)) - 1) << ((maskStart * 8)));
+			long maskedHash = val.hash & hashMask;
+			
+			// Shift frequency bits into place
+			long shiftedFreq = ((unsigned long) val.frequency) << (maskStart * 8);
+			
+			// Return the frequency spliced into the hash
+			return maskedHash | shiftedFreq;
+		};
+		
+		frequencyOrderedTree = new BinarySearchTree<WordFrequency>(getUniqueFrequencyKey);
+		
+		// Add all of the nodes from the other tree to this tree
+		int length;
+		const WordFrequency **allFreqs = _wordFrequenciesTree->asInOrderArray(length);
+		frequencyOrderedTree->insert(length, allFreqs);
+		
+		// Save it for future use, so we don't have to regenerate it
+		_wordFrequenciesTreeOrdered = frequencyOrderedTree;
+		
+	}
+	
+	return frequencyOrderedTree->asInOrderArray(returnLength);
 }
 
-bool FrequencyAnalyzer::FrequencyAnalysisResults::exportReportTo(char *outputFilePath) {
-	//TODO:
+const char *FrequencyAnalyzer::FrequencyAnalysisResults::summaryHeader() {
+	char *summaryHeader = nullptr;
+	sprintf(summaryHeader, "\n\nAnalysis for file: %s", inputFile);
+	
+	
+	
+	return nullptr;
 }
 
-bool FrequencyAnalyzer::FrequencyAnalysisResults::exportFrequenciesToCSV(char *outputFilePath) {
-	//TODO:
+const char *FrequencyAnalyzer::FrequencyAnalysisResults::textSummary() {
+	
+	return nullptr;
+}
+
+bool FrequencyAnalyzer::FrequencyAnalysisResults::exportReportTo(const char *outputFilePath) {
+	FILE *outputFile = fopen(outputFilePath, "w");
+	
+	if (outputFilePath == nullptr) {
+		return false;
+	}
+	
+	// Print out all the information contained in the results object
+	fprintf(outputFile, "Word Frequency Analysis!\nGenerated by a C++ program written by Aaron Kampmeier.");
+	
+	fprintf(outputFile, "\n\nAnalysis for file: %s", inputFile);
+	
+	// Generate time string
+	tm *localTime = localtime(&analyzedOn);
+	char *timeString = new char[20]; //Length is always 20
+	timeString[19] = '\0';
+	sprintf(timeString, "%04d-%02d-%02d %02d:%02d:%02d", localTime->tm_year + 1900, localTime->tm_mon + 1,
+			localTime->tm_mday, localTime->tm_hour, localTime->tm_min, localTime->tm_sec);
+	fprintf(outputFile, "\nAnalyzed on %s", timeString);
+	
+	fprintf(outputFile, "\n\n\n----------Analysis----------");
+	fprintf(outputFile, "\n%-22s %d", "File Word Count:", wordCount());
+	fprintf(outputFile, "\n%-22s %d ", "Total Unique Words:", totalUniqueWords());
+	
+	fprintf(outputFile, "\n\nAll words ordered by frequency:");
+	// Get all the words ordered by frequency and put them in here
+	int length;
+	const WordFrequency **wordsOrdered = wordsOrderedByFrequency(length);
+	
+	for (int i=0; i < length; i++) {
+		fprintf(outputFile, "\n%-14s: %d", wordsOrdered[i]->word, wordsOrdered[i]->frequency);
+	}
+	
+	fprintf(outputFile, "\n\nEnd of analysis.");
+	
+	fclose(outputFile);
+	return true;
+}
+
+bool FrequencyAnalyzer::FrequencyAnalysisResults::exportFrequenciesToCSV(const char *outputFilePath) {
+	FILE *outputFile = fopen(outputFilePath, "w");
+	
+	if (outputFilePath == nullptr) {
+		return false;
+	}
+	
+	fprintf(outputFile, "word,frequency");
+	
+	int length;
+	const WordFrequency **allWords = allWordFrequencies(length);
+	
+	for (int i=0; i < length; i++) {
+		fprintf(outputFile, "\n%s,%d", allWords[i]->word, allWords[i]->frequency);
+	}
+	
+	fclose(outputFile);
+	return true;
 }
 
 
@@ -234,7 +392,7 @@ FrequencyAnalyzer::FrequencyAnalysisResults::WordFrequency::~WordFrequency() {
 }
 
 FrequencyAnalyzer::FrequencyAnalysisResults::WordFrequency::WordFrequency(
-		FrequencyAnalyzer::FrequencyAnalysisResults::WordFrequency &&wordFreq): word(wordFreq.word), hash(wordFreq
+		FrequencyAnalyzer::FrequencyAnalysisResults::WordFrequency &&wordFreq) noexcept : word(wordFreq.word), hash(wordFreq
 		.hash), frequency(wordFreq.frequency) {
 	// Remove the old reference to the word so they can't delete it
 	wordFreq.word = nullptr;
@@ -271,7 +429,7 @@ FrequencyAnalyzer::FrequencyAnalysisResults::WordFrequency::operator=(
 
 FrequencyAnalyzer::FrequencyAnalysisResults::WordFrequency &
 FrequencyAnalyzer::FrequencyAnalysisResults::WordFrequency::operator=(
-		FrequencyAnalyzer::FrequencyAnalysisResults::WordFrequency &&wordFreq) {
+		FrequencyAnalyzer::FrequencyAnalysisResults::WordFrequency &&wordFreq) noexcept {
 	// Checking for self-assignment
 	if (&wordFreq == this) return *this;
 	
@@ -309,7 +467,7 @@ void FrequencyAnalyzer::FrequencyAnalysisResults::WordFrequency::incrementByOne(
  * @param str2
  * @return A new char[]
  */
-char *concatStrings(char *str1, char *str2) {
+char *concatStrings(const char *str1, const char *str2) {
 	char *newString = new char[strlen(str1) + strlen(str2) + 1];
 	strcpy(newString, str1);
 	// Second string goes at the end of the first string accomplished using pointer math

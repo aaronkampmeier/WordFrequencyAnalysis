@@ -10,7 +10,23 @@
 
 using namespace std;
 
-int main() {
+/**
+ * Program that performs frequency analysis on an input text file.
+ *
+ * Can invoke from the command line using: wordAnalyze [filePath]
+ * @return
+ */
+int main(int argc, char **argv) {
+	cout << "Welcome to frequency analysis written by Aaron Kampmeier!" << endl;
+	
+	char *inputFileToAnalyze;
+	
+	// Pull in command line argument file path
+	if (argc > 1) {
+		inputFileToAnalyze = argv[1];
+	}
+	
+	// Grab in a file to analyze
 	
 	
 	return 0;
