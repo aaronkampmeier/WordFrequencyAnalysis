@@ -41,8 +41,8 @@ int main(int argc, char **argv) {
 		if (!validCommandLineInput) {
 			cout << "Enter path to a file to analyze: " << endl;
 			cin.getline(inputFileToAnalyze, 100);
-			validCommandLineInput = false;
 		}
+		validCommandLineInput = false;
 		
 		// Analyze
 		FrequencyAnalyzer analyzer = FrequencyAnalyzer();

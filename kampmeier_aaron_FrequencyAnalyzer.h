@@ -91,6 +91,7 @@ public:
 	private:
 		BinarySearchTree<WordFrequency> *_wordFrequenciesTree;
 		BinarySearchTree<WordFrequency> *_wordFrequenciesTreeOrdered;
+		const char * const _inputFile;
 		const int _fileWordCount;
 		
 		/**
@@ -101,7 +102,6 @@ public:
 		static const char *copyString(const char *inputString);
 		
 	public:
-		const char * const inputFile;
 		const time_t analyzedOn;
 		
 	public:
@@ -120,6 +120,12 @@ public:
 		 * @return
 		 */
 		int totalUniqueWords() const;
+		
+		/**
+		 * Returns a point to the input file path name
+		 * @return
+		 */
+		const char *getInputFilePath();
 		
 		/**
 		 * Returns the frequency of the specified word. Case-insensitive.

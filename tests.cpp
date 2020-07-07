@@ -164,7 +164,7 @@ int main(int argc, char **argv) {
 					return;
 				}
 				
-				cout << "Completed frequency analysis on file " << results->inputFile << endl;
+				cout << "Completed frequency analysis on file " << results->getInputFilePath() << endl;
 				
 				cout << "Frequency of 'the': " << results->frequencyOf("the") << endl;
 				cout << "Frequency of 'baz': " << results->frequencyOf("baz") << endl;
@@ -175,7 +175,7 @@ int main(int argc, char **argv) {
 				
 				// Output to a file
 				char testOutputDir[] = "Tests/Testing Output/";
-				const char *inputFile = (results->inputFile) + 12;
+				const char *inputFile = (results->getInputFilePath()) + 12;
 				const char *outputFilePath = concatStrings(testOutputDir, inputFile);
 				
 				// Output to file

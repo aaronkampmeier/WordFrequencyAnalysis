@@ -3,6 +3,9 @@ project(Assignment_4)
 
 set(CMAKE_CXX_STANDARD 11)
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
+
 set(Proj_sources kampmeier_aaron_BinarySearchTree.h kampmeier_aaron_FrequencyAnalyzer.cpp kampmeier_aaron_FrequencyAnalyzer.h)
 
 option(Proj_test "Build tests." ON)
