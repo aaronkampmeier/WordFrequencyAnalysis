@@ -30,6 +30,7 @@ public:
 	 */
 	class FrequencyAnalysisResults {
 		friend class FrequencyAnalyzer;
+		friend std::ostream &operator<<(std::ostream&, FrequencyAnalyzer::FrequencyAnalysisResults&);
 	private:
 		
 		/**
@@ -99,12 +100,6 @@ public:
 		 */
 		static const char *copyString(const char *inputString);
 		
-		/**
-		 * Returns a basic summary header for the file analysis. Can be used for console output or file output.
-		 * @return
-		 */
-		const char *summaryHeader();
-		
 	public:
 		const char * const inputFile;
 		const time_t analyzedOn;
@@ -148,12 +143,6 @@ public:
 		const WordFrequency **wordsOrderedByFrequency(int &returnLength);
 		
 		/**
-		 * Returns a short blurb summary of the file analyzed.
-		 * @return A pointer to a longer string, must delete[] manually.
-		 */
-		const char *textSummary();
-		
-		/**
 		 * Exports a full report of the frequency analysis to a file for analysis.
 		 * @param outputFilePath
 		 * @return Successful
@@ -193,9 +182,18 @@ public:
 	 * @param inputFilePath The path to the file to perform analysis on
 	 * @param completionHandler A pointer to a function that just takes in a FrequencyAnalysisResults object pointer.
 	 * The Results pointer can be NULL if the analysis failed.
+	 * @return Whether the file read in successfully.
 	 */
-	void analyze(const char *inputFilePath, void (*completionHandler)(FrequencyAnalysisResults *));
+	bool analyze(const char *inputFilePath, void (*completionHandler)(FrequencyAnalysisResults *));
 };
+
+/**
+ * Allow printing out the results really easily.
+ * @param os
+ * @param results
+ * @return
+ */
+std::ostream &operator<<(std::ostream &os, FrequencyAnalyzer::FrequencyAnalysisResults &results);
 
 
 char *concatStrings(const char *str1, const char *str2);

@@ -11,7 +11,7 @@ FrequencyAnalyzer::FrequencyAnalyzer() = default;
 
 FrequencyAnalyzer::~FrequencyAnalyzer() = default;
 
-void FrequencyAnalyzer::analyze(const char *inputFilePath, void (*completionHandler)(FrequencyAnalysisResults *)) {
+bool FrequencyAnalyzer::analyze(const char *inputFilePath, void (*completionHandler)(FrequencyAnalysisResults *)) {
 	// Create a tree to hold word frequencies in with a lambda function that generates BST storage keys from the
 	// WordFrequency's hash
 	auto storageKeyCalc = [] (const FrequencyAnalysisResults::WordFrequency &freq) ->
@@ -24,7 +24,7 @@ void FrequencyAnalyzer::analyze(const char *inputFilePath, void (*completionHand
 	if (inFile == nullptr) {
 		// Log: failed
 		completionHandler(nullptr);
-		return;
+		return false;
 	}
 	
 	// Set up the file buffer to pull in 4 KB
@@ -125,6 +125,13 @@ void FrequencyAnalyzer::analyze(const char *inputFilePath, void (*completionHand
 						memcpy(currentReadingWord, readBuffer + readIndex - wordLength, wordLength);
 					}
 					
+					// TESTING-------
+//					if (strcmp(currentReadingWord, "LT") == 0) {
+//						int j = 0;
+//					}
+					//--------
+					
+					
 					_registerWordWithTree(currentReadingWord, wordFrequencies);
 					fileWordCount++;
 					
@@ -163,6 +170,8 @@ void FrequencyAnalyzer::analyze(const char *inputFilePath, void (*completionHand
 	auto *results = new FrequencyAnalysisResults(inputFilePath, fileWordCount, wordFrequencies);
 	
 	completionHandler(results);
+	
+	return true;
 }
 
 void FrequencyAnalyzer::_incrementWordFrequencyByOne(
@@ -207,6 +216,7 @@ FrequencyAnalyzer::FrequencyAnalysisResults::FrequencyAnalysisResults(const char
 FrequencyAnalyzer::FrequencyAnalysisResults::~FrequencyAnalysisResults() {
 	delete [] inputFile;
 	delete _wordFrequenciesTree;
+	delete _wordFrequenciesTreeOrdered;
 }
 
 const char *FrequencyAnalyzer::FrequencyAnalysisResults::copyString(const char *inputString) {
@@ -296,6 +306,7 @@ FrequencyAnalyzer::FrequencyAnalysisResults::wordsOrderedByFrequency(int &return
 		int length;
 		const WordFrequency **allFreqs = _wordFrequenciesTree->asInOrderArray(length);
 		frequencyOrderedTree->insert(length, allFreqs);
+		delete [] allFreqs;
 		
 		// Save it for future use, so we don't have to regenerate it
 		_wordFrequenciesTreeOrdered = frequencyOrderedTree;
@@ -305,24 +316,47 @@ FrequencyAnalyzer::FrequencyAnalysisResults::wordsOrderedByFrequency(int &return
 	return frequencyOrderedTree->asInOrderArray(returnLength);
 }
 
-const char *FrequencyAnalyzer::FrequencyAnalysisResults::summaryHeader() {
-	char *summaryHeader = nullptr;
-	sprintf(summaryHeader, "\n\nAnalysis for file: %s", inputFile);
+std::ostream &operator<<(std::ostream &os, FrequencyAnalyzer::FrequencyAnalysisResults &results) {
+	os << "\nAnalysis for file: " << results.inputFile << std::endl;
 	
+	// Generate time string
+	tm *localTime = localtime(&(results.analyzedOn));
+	char *timeString = new char[20]; //Length is always 20
+	timeString[19] = '\0';
+	sprintf(timeString, "%04d-%02d-%02d %02d:%02d:%02d", localTime->tm_year + 1900, localTime->tm_mon + 1,
+			localTime->tm_mday, localTime->tm_hour, localTime->tm_min, localTime->tm_sec);
+	os << "Analyzed on: " << timeString << std::endl;
 	
+	os << "\nFile word count: " << results.wordCount();
+	os << "\nTotal unique word count: " << results.totalUniqueWords() << std::endl;
 	
-	return nullptr;
-}
-
-const char *FrequencyAnalyzer::FrequencyAnalysisResults::textSummary() {
+	// Output the top 5 most and least frequently used words
+	// To do so just look at the ordered array and take the beginning and ending 5 elements
+	int length;
+	const FrequencyAnalyzer::FrequencyAnalysisResults::WordFrequency **freqs = results.wordsOrderedByFrequency(length);
 	
-	return nullptr;
+	os << "Lest frequently used words: ";
+	for (int i=0; i < 5 && i < length; i++) {
+		os << "\n" << freqs[i]->word << ": " << freqs[i]->frequency << " times";
+	}
+	os << std::endl;
+	
+	os << "\nMost frequently used words: ";
+	for (int i = length-5; i < length; i++) {
+		os << "\n" << freqs[i]->word << ": " << freqs[i]->frequency << " times";
+	}
+	os << std::endl;
+	
+	delete [] timeString;
+	delete [] freqs;
+	
+	return os;
 }
 
 bool FrequencyAnalyzer::FrequencyAnalysisResults::exportReportTo(const char *outputFilePath) {
 	FILE *outputFile = fopen(outputFilePath, "w");
 	
-	if (outputFilePath == nullptr) {
+	if (outputFile == nullptr) {
 		return false;
 	}
 	
@@ -338,6 +372,7 @@ bool FrequencyAnalyzer::FrequencyAnalysisResults::exportReportTo(const char *out
 	sprintf(timeString, "%04d-%02d-%02d %02d:%02d:%02d", localTime->tm_year + 1900, localTime->tm_mon + 1,
 			localTime->tm_mday, localTime->tm_hour, localTime->tm_min, localTime->tm_sec);
 	fprintf(outputFile, "\nAnalyzed on %s", timeString);
+	
 	
 	fprintf(outputFile, "\n\n\n----------Analysis----------");
 	fprintf(outputFile, "\n%-22s %d", "File Word Count:", wordCount());
@@ -355,6 +390,8 @@ bool FrequencyAnalyzer::FrequencyAnalysisResults::exportReportTo(const char *out
 	fprintf(outputFile, "\n\nEnd of analysis.");
 	
 	fclose(outputFile);
+	delete [] wordsOrdered;
+	delete [] timeString;
 	return true;
 }
 
@@ -375,6 +412,7 @@ bool FrequencyAnalyzer::FrequencyAnalysisResults::exportFrequenciesToCSV(const c
 	}
 	
 	fclose(outputFile);
+	delete [] allWords;
 	return true;
 }
 
