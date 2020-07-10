@@ -58,6 +58,10 @@ protected:
 		T _unsafeMutablePayload;
 	protected:
 		Node *_left, *_right;
+		
+		/**
+		 * A const reference to _unsafeMutablePayload for general use. Idea is that it cannot be modified.
+		 */
 		const T &_payload;
 	public:
 		explicit Node(const T &newPayload);

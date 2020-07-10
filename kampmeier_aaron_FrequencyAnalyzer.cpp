@@ -401,7 +401,7 @@ bool FrequencyAnalyzer::FrequencyAnalysisResults::exportReportTo(const char *out
 bool FrequencyAnalyzer::FrequencyAnalysisResults::exportFrequenciesToCSV(const char *outputFilePath) {
 	FILE *outputFile = fopen(outputFilePath, "w");
 	
-	if (outputFilePath == nullptr) {
+	if (outputFile == nullptr) {
 		return false;
 	}
 	
